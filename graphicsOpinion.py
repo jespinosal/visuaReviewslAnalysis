@@ -12,13 +12,10 @@ from matplotlib.pyplot import cm
 import numpy as np
 import matplotlib.pyplot as plt
 import squarify  # pip install squarify (algorithm for treemap)
-from pandas.plotting import parallel_coordinates
-
-
 import pandas as pd
 import gzip
 import numpy as np
-
+from pandas.plotting import parallel_coordinates
 
 
 class Preprocesamiento:
@@ -44,7 +41,7 @@ class Preprocesamiento:
 
 
 
-    def discretizacion(self, objetivo, filtro, df, niveles):
+    def discretizacion(self,objetivo, filtro, df, niveles):
         '''Clase que discretiza la variable objetivo de df en niveles
         input:df = dataframe de referencia
         objetivo = vatiable de df sobre la que se hace el analisis
@@ -76,14 +73,14 @@ class Preprocesamiento:
                 dfSubset = df[df.asin == filtro]
             frec = dfSubset.groupby(objetivo).count()[['asin']]
             # lab = frec.index
-        self.frec = frec
+        return frec
 
     def discretizacionArray(self,listaProductos, df, n=5, mode='levels'):
         '''Esta función agrupa elementos de df según mode'''
         arrayProductos = []
         if mode == 'levels':
             for i in listaProductos:
-                r = discretizacion('overall', i, df, n)
+                r = self.discretizacion('overall', i, df, n)
                 arrayProductos.append(list(r.asin))
             indices = r.index.categories
         elif mode == 'overall':
@@ -101,8 +98,14 @@ class Preprocesamiento:
         self.inputs = np.array(arrayProductos)
         self.labels = indices
 
+    def fillEmptyTopics(self,summarize, nTopics=10):
+        maximos = ['T' + str(i) for i in range(0, nTopics)]
+        # maximos = pd.DataFrame({'maximos':maximos})
+        asin = list(pd.unique(summarize.asin))
+        return pd.DataFrame([(x, y) for x in asin for y in maximos], columns=['asin', 'maximos'])
+
     def summarize(self):
-        topicsByClient = fillEmptyTopics(self.dfSummarized, nTopics=10)
+        topicsByClient = self.fillEmptyTopics(self.dfSummarized, nTopics=10)
         self.summarize2 = pd.merge(topicsByClient, self.dfSummarized, on=['asin', 'maximos'], how='left')
         self.summarize2['overall'] = self.summarize2['overall'].fillna(0)
         self.summarize2['summary'] = self.summarize2['summary'].fillna(0)
@@ -121,7 +124,7 @@ class Preprocesamiento:
         dfSummary0Pos['overall'] = dfSummary0Pos.summary * dfSummary0Pos.overall
         dfSummary0Neg['overall'] = dfSummary0Neg.summary * dfSummary0Neg.overall
 
-        topicsByClient = fillEmptyTopics(dfVideoGames, nTopics=n)
+        topicsByClient = self.fillEmptyTopics(dfVideoGames, nTopics=n)
 
         dfSummary0Pos0 = pd.merge(topicsByClient, dfSummary0Pos, on=['asin', 'maximos'], how='left')
         dfSummary0Pos0['overall'] = dfSummary0Pos0['overall'].fillna(0)
@@ -141,7 +144,7 @@ class Preprocesamiento:
         dfVideoGamesNorm['overall'] = dfVideoGamesNorm['overall']
         dfSummary0 = dfVideoGamesNorm.groupby(['asin', 'maximos'], as_index=False, sort=True).agg(
             {'overall': 'mean', 'summary': 'count'})
-        topicsByClient = fillEmptyTopics(dfVideoGames, nTopics=10)
+        topicsByClient = self.fillEmptyTopics(dfVideoGames, nTopics=10)
         dfSummary0 = pd.merge(topicsByClient, dfSummary0, on=['asin', 'maximos'], how='left')
         dfSummary0['overall'] = dfSummary0['overall'].fillna(0)
         dfSummary0['summary'] = dfSummary0['summary'].fillna(0)
@@ -320,7 +323,7 @@ class graphicsCompare(Preprocesamiento):
 
 
 class graphicsTime:
-    
+
     def __init__(self,df):
         self.df = df
 
@@ -339,7 +342,7 @@ class graphicsTime:
         plt.show()
 
     ############## Time series
-    def expandReviewTime(df):
+    def expandReviewTime(self,df):
         date = (df.reviewTime).str.split(',', expand=True).rename(columns={0: 'dia_mes', 1: 'año'})
         date2 = date.dia_mes.str.split(' ', expand=True).rename(columns={0: 'dia', 1: 'mes'})
         df['año'] = date.año;
@@ -349,7 +352,7 @@ class graphicsTime:
         return df
 
     def plotSeries(self, productos, target, modo, topics, xlabel='Años', ylabel='Magnitud', titulo='Titulo'):
-        df2 = expandReviewTime(self.df)
+        df2 = self.expandReviewTime(self.df)
         df3 = df2.groupby([modo, 'año'], as_index=False, sort=True).agg({'overall': 'mean', 'summary': 'count'})
         if productos:
             for producto in productos:
@@ -370,7 +373,7 @@ class graphicsTime:
     ############## Paralllel plot
     def parallelPlot(self,yearI, yearF, target='Años', xlabel='Topics', ylabel='Valoración promedio',
                      title='Valoración por año'):
-        data = expandReviewTime(self.df)
+        data = self.expandReviewTime(self.df)
         dfVideoGamesSummary1 = pd.pivot_table(data, values='overall', index=['maximos'], columns=['año'],
                                               aggfunc=np.average)
         dfVideoGamesSummary1 = dfVideoGamesSummary1.transpose()
@@ -475,10 +478,6 @@ if __name__ == "__main__":
     graficosComparacion.barChartVs2(ylabel='Valoración',Title= 'Opiniones por producto')
     ############################################
     products = ['B000006P0K','6050036071']
-    dfSummay0Filter0, dfSummay0Filter1 = compititiveSummary(dfVideoGames,products)
-    inputs,labels=ProductsToArray(products, dfSummay0Filter0, dfSummay0Filter1)
-    horizontalBar(inputs,labels)
-    barChartVs3(inputs,labels, ylabel='Valoración',Title= 'Opiniones por producto')
     graficosComparacion = graphicsCompare()
     graficosComparacion.compititiveSummary(dfVideoGames,products)
     graficosComparacion.productsToArray(products)
